@@ -23,6 +23,12 @@ services:
       - "worker2:172.28.1.3"
       - "zeppelin:172.28.1.5"
       - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
 
   master:
     image: panovvv/hadoop-hive-spark:2.5
@@ -68,6 +74,12 @@ services:
       - "hivemetastore:172.28.1.4"
       - "zeppelin:172.28.1.5"
       - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
 
   worker1:
     image: panovvv/hadoop-hive-spark:2.5
@@ -102,6 +114,12 @@ services:
       - "hivemetastore:172.28.1.4"
       - "zeppelin:172.28.1.5"
       - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
 
   worker2:
     image: panovvv/hadoop-hive-spark:2.5
@@ -137,6 +155,12 @@ services:
       - "hivemetastore:172.28.1.4"
       - "zeppelin:172.28.1.5"
       - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
 
   livy:
     image: panovvv/livy:2.5
@@ -159,7 +183,7 @@ services:
       - LOCAL_DIR_WHITELIST=/data/batches/
       - ENABLE_HIVE_CONTEXT=false
       # Defaults are fine for variables below. Uncomment to change them.
-#      - LIVY_HOST=0.0.0.0
+      - LIVY_HOST=172.28.1.6
 #      - LIVY_PORT=8998
     expose:
       - 1-65535
@@ -174,6 +198,12 @@ services:
       - "worker2:172.28.1.3"
       - "hivemetastore:172.28.1.4"
       - "zeppelin:172.28.1.5"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
 
   zeppelin:
     image: panovvv/zeppelin-bigdata:2.5
@@ -203,6 +233,197 @@ services:
       - "worker2:172.28.1.3"
       - "hivemetastore:172.28.1.4"
       - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
+
+  redis:
+    image: 'redis:5.0.5'
+    # command: redis-server --requirepass redispass
+    networks:
+      spark_net:
+        ipv4_address: 172.28.1.7
+    extra_hosts:
+      - "master:172.28.1.1"
+      - "worker1:172.28.1.2"
+      - "worker2:172.28.1.3"
+      - "hivemetastore:172.28.1.4"
+      - "zeppelin:172.28.1.5"
+      - "livy:172.28.1.6"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
+
+  postgres:
+    image: postgres:9.6
+    environment:
+        - POSTGRES_USER=airflow
+        - POSTGRES_PASSWORD=airflow
+        - POSTGRES_DB=airflow
+    # Uncomment these lines to persist data on the local filesystem.
+    #     - PGDATA=/var/lib/postgresql/data/pgdata
+    # volumes:
+    #     - ./pgdata:/var/lib/postgresql/data/pgdata
+    networks:
+      spark_net:
+        ipv4_address: 172.28.1.8
+    extra_hosts:
+      - "master:172.28.1.1"
+      - "worker1:172.28.1.2"
+      - "worker2:172.28.1.3"
+      - "hivemetastore:172.28.1.4"
+      - "zeppelin:172.28.1.5"
+      - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
+
+  webserver:
+    image: puckel/docker-airflow:1.10.9
+    restart: always
+    depends_on:
+        - postgres
+        - redis
+    environment:
+        - LOAD_EX=n
+        - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+        - EXECUTOR=Celery
+        # - POSTGRES_USER=airflow
+        # - POSTGRES_PASSWORD=airflow
+        # - POSTGRES_DB=airflow
+        # - REDIS_PASSWORD=redispass
+    volumes:
+        - ./dags:/usr/local/airflow/dags
+        - ./data:/data
+        # Uncomment to include custom plugins
+        # - ./plugins:/usr/local/airflow/plugins
+    ports:
+        - "8083:8080"
+    command: webserver
+    healthcheck:
+        test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+        interval: 30s
+        timeout: 30s
+        retries: 3
+    networks:
+      spark_net:
+        ipv4_address: 172.28.1.9
+    extra_hosts:
+      - "master:172.28.1.1"
+      - "worker1:172.28.1.2"
+      - "worker2:172.28.1.3"
+      - "hivemetastore:172.28.1.4"
+      - "zeppelin:172.28.1.5"
+      - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
+
+
+  flower:
+    image: puckel/docker-airflow:1.10.9
+    restart: always
+    depends_on:
+        - redis
+    environment:
+        - EXECUTOR=Celery
+        # - REDIS_PASSWORD=redispass
+    ports:
+        - "5555:5555"
+    command: flower
+    networks:
+      spark_net:
+        ipv4_address: 172.28.1.10
+    extra_hosts:
+      - "master:172.28.1.1"
+      - "worker1:172.28.1.2"
+      - "worker2:172.28.1.3"
+      - "hivemetastore:172.28.1.4"
+      - "zeppelin:172.28.1.5"
+      - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "scheduler:172.28.1.11"
+      - "worker:172.28.1.12"
+
+
+  scheduler:
+    image: puckel/docker-airflow:1.10.9
+    restart: always
+    depends_on:
+        - webserver
+    volumes:
+        - ./dags:/usr/local/airflow/dags
+        # Uncomment to include custom plugins
+        # - ./plugins:/usr/local/airflow/plugins
+    environment:
+        - LOAD_EX=n
+        - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+        - EXECUTOR=Celery
+        # - POSTGRES_USER=airflow
+        # - POSTGRES_PASSWORD=airflow
+        # - POSTGRES_DB=airflow
+        # - REDIS_PASSWORD=redispass
+    command: scheduler
+    networks:
+      spark_net:
+        ipv4_address: 172.28.1.11
+    extra_hosts:
+      - "master:172.28.1.1"
+      - "worker1:172.28.1.2"
+      - "worker2:172.28.1.3"
+      - "hivemetastore:172.28.1.4"
+      - "zeppelin:172.28.1.5"
+      - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "worker:172.28.1.12"
+
+
+  worker:
+    image: puckel/docker-airflow:1.10.9
+    restart: always
+    depends_on:
+        - scheduler
+    volumes:
+        - ./dags:/usr/local/airflow/dags
+        # Uncomment to include custom plugins
+        # - ./plugins:/usr/local/airflow/plugins
+    environment:
+        - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+        - EXECUTOR=Celery
+        # - POSTGRES_USER=airflow
+        # - POSTGRES_PASSWORD=airflow
+        # - POSTGRES_DB=airflow
+        # - REDIS_PASSWORD=redispass
+    command: worker
+    networks:
+      spark_net:
+        ipv4_address: 172.28.1.12
+    extra_hosts:
+      - "master:172.28.1.1"
+      - "worker1:172.28.1.2"
+      - "worker2:172.28.1.3"
+      - "hivemetastore:172.28.1.4"
+      - "zeppelin:172.28.1.5"
+      - "livy:172.28.1.6"
+      - "redis:172.28.1.7"
+      - "postgres:172.28.1.8"
+      - "webserver:172.28.1.9"
+      - "flower:172.28.1.10"
+      - "scheduler:172.28.1.11"
 
 networks:
   spark_net:
